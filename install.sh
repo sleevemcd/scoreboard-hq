@@ -14,6 +14,10 @@ else
   cd "$DIR" && git pull
 fi
 
+echo "== Fixing file permissions for nginx =="
+chmod -R a+rX "$DIR"
+chown -R root:root "$DIR" 2>/dev/null || true
+
 echo "== Starting container =="
 cd "$DIR" && docker compose up -d --build
 
