@@ -84,6 +84,56 @@ switch ($route) {
     }
     break;
 
+  // ─── Active game states (for live display) ───
+  case 'game-state':
+    $file = "$dataDir/game-states.json";
+    if ($method === 'GET') {
+      $states = readJson($file, []);
+      // Clean up states older than 5 minutes
+      $now = time();
+      $states = array_values(array_filter($states, fn($s) => ($now - ($s['ts'] ?? 0)) < 300));
+      writeJson($file, $states);
+      echo json_encode($states);
+    } elseif ($method === 'POST') {
+      $input = json_decode(file_get_contents('php://input'), true);
+      if ($input && is_array($input) && isset($input['id'])) {
+        $states = readJson($file, []);
+        // Update existing or add new
+        $found = false;
+        foreach ($states as $i => $s) {
+          if (($s['id'] ?? '') === $input['id']) {
+            $states[$i] = $input;
+            $found = true;
+            break;
+          }
+        }
+        if (!$found) $states[] = $input;
+        // Clean up old states
+        $now = time();
+        $states = array_values(array_filter($states, fn($s) => ($now - ($s['ts'] ?? 0)) < 300));
+        writeJson($file, $states);
+        echo '{"ok":true}';
+      } else {
+        http_response_code(400);
+        echo '{"error":"invalid JSON or missing id"}';
+      }
+    } elseif ($method === 'DELETE') {
+      $id = $_GET['id'] ?? null;
+      if ($id) {
+        $states = readJson($file, []);
+        $states = array_values(array_filter($states, fn($s) => ($s['id'] ?? '') !== $id));
+        writeJson($file, $states);
+        echo '{"ok":true}';
+      } else {
+        http_response_code(400);
+        echo '{"error":"missing id"}';
+      }
+    } else {
+      http_response_code(405);
+      echo '{"error":"method not allowed"}';
+    }
+    break;
+
   // ─── Health check ───
   case 'ping':
     echo '{"ok":true,"ts":' . time() . '}';

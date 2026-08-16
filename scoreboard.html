@@ -566,6 +566,63 @@ body.display-mode .scoreboard { display: none !important; }
   font-size: 18px; font-weight: 800; color: var(--danger);
   border-radius: var(--radius); z-index: 5;
 }
+.edit-overlay {
+  position: fixed; inset: 0; background: rgba(15,15,26,0.85);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.edit-card {
+  background: var(--surface); border: 2px solid var(--surface2); border-radius: var(--radius);
+  padding: 24px; width: 90%; max-width: 340px;
+}
+.edit-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+.edit-card label { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; margin-top: 12px; }
+.edit-card input {
+  width: 100%; padding: 10px 14px; border: 2px solid var(--surface2); border-radius: var(--radius-sm);
+  background: var(--surface2); color: var(--text); font-size: 15px; outline: none;
+}
+.edit-card input:focus { border-color: var(--primary); }
+.edit-card input:read-only { opacity: 0.5; cursor: not-allowed; }
+.edit-card .edit-btns { display: flex; gap: 8px; margin-top: 20px; }
+.edit-card .edit-btns button {
+  flex: 1; padding: 10px; border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.edit-card .btn-save { background: var(--primary); color: var(--bg); }
+.edit-card .btn-cancel { background: var(--surface2); color: var(--text-dim); }
+.edit-card .btn-delete { background: rgba(255,71,87,0.15); color: var(--danger); flex: 0; padding: 10px 16px; }
+.roster-chip .edit-icon {
+  width: 18px; height: 18px; border: none; border-radius: 50%;
+  background: transparent; color: var(--text-dimmer); font-size: 10px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.roster-chip .edit-icon:hover { color: var(--primary); background: rgba(0,255,136,0.1); }
+.d-multi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; padding: 16px; width: 100%;
+}
+.d-multi-card {
+  background: #1a1a2e; border: 2px solid #25253e; border-radius: 12px;
+  padding: 16px; min-width: 0;
+}
+.dmc-label {
+  font-size: clamp(12px, 1.5vmin, 18px); font-weight: 700; color: #00ff88;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+}
+.dmc-winner {
+  font-size: clamp(14px, 2vmin, 22px); font-weight: 800; color: #ffd700;
+  margin-bottom: 12px;
+}
+.dmc-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px; margin-bottom: 4px;
+  font-size: clamp(12px, 1.5vmin, 18px);
+}
+.dmc-row.turn { background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); }
+.dmc-row.leader .dmc-total { color: #ffd700; font-weight: 800; }
+.dmc-rank { width: 28px; text-align: center; font-size: clamp(12px, 1.4vmin, 16px); }
+.dmc-name { flex: 1; font-weight: 600; }
+.dmc-total { font-weight: 700; color: #00ff88; font-size: clamp(14px, 1.8vmin, 22px); }
 </style>
 </head>
 <body>
@@ -607,12 +664,9 @@ body.display-mode .scoreboard { display: none !important; }
         <button class="live-toggle" id="liveToggle">Off</button>
       </div>
       <div class="live-body" id="liveBody">
-        <p class="live-hint">Show this game live on a TV or second device. Open the link below there and it will update in real time.</p>
-        <div class="live-code-row">
-          <input id="liveCode" maxlength="20" spellcheck="false" autocomplete="off" placeholder="CODE">
-          <button class="live-copy" id="liveCopyBtn">Copy URL</button>
-        </div>
-        <div class="live-url" id="liveUrl"></div>
+        <p class="live-hint">Show this game live on a TV. Open the display URL on any device on your network.</p>
+        <div class="live-url" id="liveUrl" style="font-size:13px;word-break:break-all;padding:8px;background:var(--surface2);border-radius:var(--radius-sm);margin-top:8px"></div>
+        <button class="live-copy" id="liveCopyBtn" style="margin-top:8px;width:100%;padding:10px">Copy Display URL</button>
       </div>
     </div>
     <button class="btn-start" id="startBtn" disabled>Start Game</button>
@@ -741,6 +795,7 @@ const PIG_DOUBLES = {
 
 let state = {
   game: 'chipstick',
+  gameId: null,
   players: [],
   totalRounds: 9,
   ballsPerRound: BALLS_PER_ROUND,
@@ -942,8 +997,11 @@ function loadPlayers() {
   if (!raw) return { players: [], selected: [] };
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return { players: parsed, selected: [] };
-    if (parsed && Array.isArray(parsed.players)) return { players: parsed.players, selected: parsed.selected || [] };
+    if (Array.isArray(parsed)) return { players: parsed.map(n => typeof n === 'string' ? { name: n, nickname: '' } : n), selected: [] };
+    if (parsed && Array.isArray(parsed.players)) {
+      const players = parsed.players.map(p => typeof p === 'string' ? { name: p, nickname: '' } : p);
+      return { players, selected: parsed.selected || [] };
+    }
   } catch {}
   return { players: [], selected: [] };
 }
@@ -952,38 +1010,53 @@ function savePlayers() {
   lsSet(PLAYERS_KEY, JSON.stringify({ players: roster, selected: selPlayers }));
 }
 
+function getDisplayName(name) {
+  const p = roster.find(x => x.name === name);
+  return (p && p.nickname) ? p.nickname : name;
+}
+
 function renderRoster() {
   if (roster.length === 0) {
     rosterEl.innerHTML = '<div class="roster-empty">Add a name below — it gets saved here for next time.</div>';
   } else {
-    rosterEl.innerHTML = roster.map((name, i) =>
-      `<div class="roster-chip ${selPlayers.includes(name) ? 'selected' : ''}" data-i="${i}">
-        <span>${name}</span><button class="remove" data-i="${i}">✕</button>
-      </div>`
-    ).join('');
+    rosterEl.innerHTML = roster.map((p, i) => {
+      const display = p.nickname || p.name;
+      const sub = p.nickname ? `<span style="font-size:10px;color:var(--text-dimmer);margin-left:4px">(${p.name})</span>` : '';
+      return `<div class="roster-chip ${selPlayers.includes(p.name) ? 'selected' : ''}" data-i="${i}">
+        <span>${display}${sub}</span>
+        <button class="edit-icon" data-i="${i}" title="Edit nickname">✎</button>
+        <button class="remove" data-i="${i}">✕</button>
+      </div>`;
+    }).join('');
   }
   rosterEl.querySelectorAll('.roster-chip').forEach(chip => {
     chip.addEventListener('click', e => {
-      if (e.target.classList.contains('remove')) return;
+      if (e.target.classList.contains('remove') || e.target.classList.contains('edit-icon')) return;
       toggleSelect(parseInt(chip.dataset.i));
     });
   });
   rosterEl.querySelectorAll('.roster-chip .remove').forEach(rm => {
     rm.addEventListener('click', () => removePlayer(parseInt(rm.dataset.i)));
   });
+  rosterEl.querySelectorAll('.roster-chip .edit-icon').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      editPlayer(parseInt(btn.dataset.i));
+    });
+  });
   rosterCount.textContent = selPlayers.length ? `${selPlayers.length} selected` : '';
   updateStartBtn();
 }
 
 function toggleSelect(i) {
-  const name = roster[i];
+  const name = roster[i].name;
   if (selPlayers.includes(name)) selPlayers = selPlayers.filter(n => n !== name);
   else selPlayers.push(name);
   renderRoster();
 }
 
 function removePlayer(i) {
-  const name = roster[i];
+  const name = roster[i].name;
   roster.splice(i, 1);
   selPlayers = selPlayers.filter(n => n !== name);
   savePlayers();
@@ -992,12 +1065,56 @@ function removePlayer(i) {
 
 function addPlayer() {
   const name = playerInput.value.trim();
-  if (!name || roster.includes(name) || roster.length >= 12) return;
-  roster.push(name);
+  if (!name || roster.some(p => p.name === name) || roster.length >= 12) return;
+  roster.push({ name, nickname: '' });
   selPlayers.push(name);
   savePlayers();
   playerInput.value = '';
   renderRoster();
+}
+
+function editPlayer(i) {
+  const p = roster[i];
+  const overlay = document.createElement('div');
+  overlay.className = 'edit-overlay';
+  overlay.innerHTML = `
+    <div class="edit-card">
+      <h3>Edit Player</h3>
+      <label>Name (permanent)</label>
+      <input id="editName" type="text" value="${p.name}" readonly>
+      <label>Nickname (display)</label>
+      <input id="editNickname" type="text" value="${p.nickname}" maxlength="16" placeholder="${p.name}">
+      <div class="edit-btns">
+        <button class="btn-cancel">Cancel</button>
+        <button class="btn-delete" title="Remove player">✕</button>
+        <button class="btn-save">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const nicknameInput = overlay.querySelector('#editNickname');
+  nicknameInput.focus();
+
+  overlay.querySelector('.btn-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('.btn-delete').addEventListener('click', () => {
+    removePlayer(i);
+    overlay.remove();
+  });
+
+  overlay.querySelector('.btn-save').addEventListener('click', () => {
+    const newNickname = nicknameInput.value.trim();
+    roster[i].nickname = newNickname;
+    savePlayers();
+    renderRoster();
+    overlay.remove();
+  });
+
+  nicknameInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') overlay.querySelector('.btn-save').click();
+    if (e.key === 'Escape') overlay.remove();
+  });
 }
 
 function updateStartBtn() { startBtn.disabled = selPlayers.length < 2; }
@@ -1021,6 +1138,7 @@ playerInput.addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(
 
 startBtn.addEventListener('click', () => {
   if (selPlayers.length < 2) return;
+  state.gameId = Date.now();
   state.players = [...selPlayers];
   state.currentRound = 1;
   state.currentBall = 1;
@@ -1104,7 +1222,7 @@ function enterResults() {
     roundTotals: state.game === 'pigs' ? [] : getPlayerRoundTotals(p),
   })).sort((a, b) => b.total - a.total);
   const win = totals[0];
-  winnerName.textContent = win.name;
+  winnerName.textContent = getDisplayName(win.name);
   if (state.game === 'pigs') {
     winnerScore.textContent = `First to 100!`;
   } else {
@@ -1120,7 +1238,7 @@ function enterResults() {
     }
     return `<div class="row">
       <div class="rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</div>
-      <div class="pname">${t.name}</div>
+      <div class="pname">${getDisplayName(t.name)}</div>
       ${detail}
       <div class="ptotal">${t.total}</div>
     </div>`;
@@ -1232,7 +1350,7 @@ function renderStats() {
     const isChamp = s.winRate >= 50 && s.gamesPlayed >= 2;
     html += `<div class="stat-card">
       <div class="sc-top">
-        <div class="sc-name">${name}</div>
+        <div class="sc-name">${getDisplayName(name)}</div>
         <div class="sc-badge ${isChamp ? 'win' : 'none'}">${s.wins}W / ${s.gamesPlayed - s.wins}L</div>
       </div>
       <div class="sc-grid">
@@ -1254,7 +1372,7 @@ function renderStats() {
     html += `<div class="game-entry" data-idx="${rev.length - 1 - ri}" data-id="${g.id}">
       <div class="ge-top">
         <div><div class="ge-tag">${g.gameLabel} · ${g.date} ${g.time}</div>
-        <div class="ge-winner"><span>${g.winner}</span> · ${g.winnerScore} pts</div></div>
+        <div class="ge-winner"><span>${getDisplayName(g.winner)}</span> · ${g.winnerScore} pts</div></div>
         <div style="display:flex;align-items:center;gap:4px">
           <button class="ge-delete" data-id="${g.id}" title="Delete game">✕</button>
           <div style="color:var(--text-dimmer);font-size:16px">${isExpanded ? '▼' : '▶'}</div>
@@ -1262,13 +1380,13 @@ function renderStats() {
       </div>
       <div class="ge-players">
         ${g.players.map((p, pi) =>
-          `<span class="ge-pill ${p === g.winner ? 'ge-1st' : ''}">${p} ${g.totals[pi]}</span>`
+          `<span class="ge-pill ${p === g.winner ? 'ge-1st' : ''}">${getDisplayName(p)} ${g.totals[pi]}</span>`
         ).join('')}
       </div>
       <div class="ge-detail ${isExpanded ? 'open' : ''}" id="gd_${g.id}">
         ${g.players.map(p => {
           const idx = g.players.indexOf(p);
-          return `<div class="ge-row"><span class="ge-rp">${p}</span><span class="ge-rs">${g.totals[idx]} pts</span></div>`;
+          return `<div class="ge-row"><span class="ge-rp">${getDisplayName(p)}</span><span class="ge-rs">${g.totals[idx]} pts</span></div>`;
         }).join('')}
         <div class="ge-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--surface2);color:var(--text-dimmer);font-size:10px">
           ${g.totalRounds} ${g.game === 'pigs' ? 'turns' : 'rounds'} · ${g.ballsPerRound > 0 ? g.ballsPerRound + ' balls/round' : 'Pigs'}
@@ -1350,8 +1468,9 @@ function liveUrl() {
 
 function pushLive() {
   if (!liveEnabled || !gameInProgress || state.players.length === 0) return;
+  const gameId = 'game_' + state.gameId;
   const payload = {
-    type: 'game', t: Date.now(), code: liveCode(),
+    id: gameId, ts: Date.now(),
     game: state.game, gameLabel: DEFS[state.game].label,
     players: [...state.players], totalRounds: state.totalRounds,
     round: state.currentRound, ball: state.currentBall, currentPlayer: state.currentPlayer,
@@ -1366,8 +1485,14 @@ function pushLive() {
   }
   clearTimeout(livePushTimer);
   livePushTimer = setTimeout(() => {
+    if (apiAvailable) {
+      fetch('/api.php?route=game-state', {
+        method: 'POST', body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+      }).catch(() => {});
+    }
     fetch('https://ntfy.sh/' + liveCode(), {
-      method: 'POST', body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify({ ...payload, code: liveCode() }),
       headers: { 'Content-Type': 'application/json' },
     }).catch(() => {});
   }, 600);
@@ -1375,26 +1500,41 @@ function pushLive() {
 
 function pushResult() {
   if (!liveEnabled || state.players.length === 0) return;
+  const gameId = 'game_' + state.gameId;
   const totals = state.players.map(p => ({ name: p, total: pigsGetPlayerTotal(p) }));
   const winner = totals.reduce((a, b) => a.total >= b.total ? a : b);
   const payload = {
-    type: 'game', t: Date.now(), code: liveCode(),
+    id: gameId, ts: Date.now(),
     game: state.game, gameLabel: DEFS[state.game].label,
     players: [...state.players], totalRounds: state.totalRounds,
     round: state.currentRound, ball: state.currentBall, currentPlayer: state.currentPlayer,
     scores: JSON.parse(JSON.stringify(state.scores)),
     status: 'finished', winner: winner.name, winnerScore: winner.total,
   };
+  if (state.game === 'pigs') {
+    payload.pigsTurnScore = pigsState.turnScore;
+    payload.pigsTurnThrows = [...pigsState.turnThrows];
+    payload.pigsCurrentPlayer = state.currentPlayer;
+    payload.pigsEliminated = state.players.filter(p => state.scores[p] && state.scores[p].eliminated);
+  }
   clearTimeout(livePushTimer);
+  if (apiAvailable) {
+    fetch('/api.php?route=game-state', {
+      method: 'POST', body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => {});
+  }
   fetch('https://ntfy.sh/' + liveCode(), {
-    method: 'POST', body: JSON.stringify(payload),
+    method: 'POST', body: JSON.stringify({ ...payload, code: liveCode() }),
     headers: { 'Content-Type': 'application/json' },
   }).catch(() => {});
 }
 
 function refreshLiveUI() {
-  liveCodeEl.value = liveCode();
-  liveUrlEl.textContent = liveUrl();
+  const displayUrl = new URL(location.href);
+  displayUrl.searchParams.delete('code');
+  displayUrl.searchParams.set('display', '1');
+  liveUrlEl.textContent = displayUrl.href;
   liveToggle.textContent = liveEnabled ? 'On' : 'Off';
   liveToggle.classList.toggle('on', liveEnabled);
   liveBody.classList.toggle('show', liveEnabled);
@@ -1404,15 +1544,6 @@ function refreshLiveUI() {
 liveToggle.addEventListener('click', () => {
   liveEnabled = !liveEnabled;
   lsSet(LIVE_KEY, liveEnabled ? '1' : '0');
-  refreshLiveUI();
-});
-
-liveCodeEl.addEventListener('change', () => {
-  let c = liveCodeEl.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20);
-  if (!c) c = genCode();
-  liveCodeEl.value = c;
-  liveCodeCache = c;
-  lsSet(LIVECODE_KEY, c);
   refreshLiveUI();
 });
 
@@ -1442,96 +1573,151 @@ function fallbackCopy(text, done) {
     done();
   } catch (e) { /* give up silently */ }
 }
-liveCopyBtn.addEventListener('click', () => copyText(liveUrl()));
+liveCopyBtn.addEventListener('click', () => {
+  const displayUrl = new URL(location.href);
+  displayUrl.searchParams.delete('code');
+  displayUrl.searchParams.set('display', '1');
+  copyText(displayUrl.href, liveCopyBtn, 'Copied ✓');
+});
 
 function initDisplay() {
   document.body.classList.add('display-mode');
-  const code = new URLSearchParams(location.search).get('code');
-  if (code) {
-    displayCode.value = code.toUpperCase();
-    connectDisplay(code.toUpperCase());
-  }
-  displayConnectBtn.addEventListener('click', () => {
-    const c = displayCode.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
-    if (c) connectDisplay(c);
-  });
-  displayCode.addEventListener('keydown', e => { if (e.key === 'Enter') displayConnectBtn.click(); });
   requestWakeLock();
+  const conn = $('displayConnect');
+  if (conn) conn.style.display = 'none';
+  displayBoard.classList.add('show');
+  renderMultiWaiting();
+  serverPollLoop();
 }
 
-function connectDisplay(code) {
-  window._dispCode = code;
-  if (window._esCtrl) { try { window._esCtrl.abort(); } catch {} }
-  window._esCtrl = new AbortController();
-  window._lastSnap = null;
-  window._lastId = null;
-  window._confettied = false;
-  displayStatus.textContent = 'Connecting to ' + code + '…';
-  displayStatus.className = '';
-  pollLoop(code);
-}
-
-async function pollLoop(code) {
-  while (window._dispCode === code) {
-    const first = !window._lastSnap;
+async function serverPollLoop() {
+  while (true) {
     try {
-      const since = window._lastId ? 'since=' + encodeURIComponent(window._lastId) : 'since=all';
-      const r = await fetch('https://ntfy.sh/' + code + '/json?' + since, { signal: window._esCtrl.signal });
-      if (first && !window._lastSnap && window._dispCode === code) {
-        renderWaiting();
-        displayStatus.textContent = 'Connected to ' + code;
-        displayStatus.className = 'ok';
+      const r = await fetch('/api.php?route=game-state');
+      if (r.ok) {
+        const states = await r.json();
+        renderMultiGame(states);
       }
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf('\n')) >= 0) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (line) handleDisplayLine(line, code);
-        }
-      }
-      await new Promise(res => setTimeout(res, 1000));
-    } catch (e) {
-      if (window._dispCode !== code) return;
-      displayStatus.textContent = 'Connection lost — retrying…';
-      displayStatus.className = 'err';
-      await new Promise(res => setTimeout(res, 2000));
-    }
+    } catch {}
+    await new Promise(res => setTimeout(res, 1500));
   }
 }
 
-function handleDisplayLine(line, code) {
-  let obj;
-  try { obj = JSON.parse(line); } catch { return; }
-  if (!obj || obj.event !== 'message' || !obj.message) return;
-  let snap;
-  try { snap = JSON.parse(obj.message); } catch { return; }
-  if (!snap || snap.type !== 'game') return;
-  if (window._lastSnap && snap.t < window._lastSnap.t) return;
-  window._lastSnap = snap;
-  window._lastId = obj.id;
-  renderDisplay(snap);
-  displayStatus.textContent = 'Connected to ' + code;
-  displayStatus.className = 'ok';
+function renderMultiWaiting() {
+  dStandings.innerHTML = '<div style="text-align:center;color:#8a8aa0;font-size:clamp(16px,2.5vmin,28px);padding:4em 0">Waiting for a game to start…</div>';
+  dFooter.innerHTML = 'Waiting for a game to start…';
+  dWinner.classList.remove('show');
+  dGameLabel.textContent = 'Scoreboard HQ';
 }
 
-function renderWaiting() {
-  const conn = $('displayConnect');
-  conn.style.display = 'none';
-  displayBoard.classList.add('show');
-  dGameLabel.textContent = '—';
-  dRound.textContent = '1';
-  dTotalRounds.textContent = '9';
-  dBall.textContent = '1';
+function renderMultiGame(states) {
+  if (!states || states.length === 0) {
+    renderMultiWaiting();
+    return;
+  }
+  if (states.length === 1) {
+    renderSingleDisplay(states[0]);
+    return;
+  }
+  dGameLabel.textContent = `${states.length} Active Games`;
   dWinner.classList.remove('show');
-  dStandings.innerHTML = '<div style="text-align:center;color:#8a8aa0;font-size:clamp(16px,2.5vmin,28px);padding:4em 0">Waiting for the game to start…</div>';
-  dFooter.innerHTML = 'Waiting for the game to start…';
+  dRoundWrap.style.display = 'none';
+
+  let html = '<div class="d-multi-grid">';
+  states.forEach(s => {
+    const def = DEFS[s.game] || {};
+    const players = s.players || [];
+    const totals = players.map(p => ({
+      name: p,
+      total: playerTotalFromSnap(s, p)
+    })).sort((a, b) => b.total - a.total);
+    const leader = totals[0];
+    const turnName = s.status === 'live' ? (players[s.currentPlayer] || '') : '';
+
+    html += `<div class="d-multi-card">`;
+    html += `<div class="dmc-label">${esc(s.gameLabel || def.label || 'Game')}</div>`;
+
+    if (s.status === 'finished') {
+      html += `<div class="dmc-winner">🏆 ${esc(s.winner || '')} · ${s.winnerScore ?? ''} pts</div>`;
+    }
+
+    totals.forEach((t, i) => {
+      const isTurn = t.name === turnName && s.status === 'live';
+      const isLeader = t.total > 0 && leader && t.name === leader.name;
+      html += `<div class="dmc-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
+        <span class="dmc-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i+1)}</span>
+        <span class="dmc-name">${esc(getDisplayName(t.name))}</span>
+        <span class="dmc-total">${t.total}</span>
+      </div>`;
+    });
+
+    html += `</div>`;
+  });
+  html += '</div>';
+  dStandings.innerHTML = html;
+  dFooter.innerHTML = states.map(s => {
+    const turnName = s.status === 'live' ? (s.players[s.currentPlayer] || '') : '';
+    return turnName ? `🎯 ${esc(getDisplayName(turnName))} is up` : '';
+  }).filter(Boolean).join(' · ') || 'Multiple games in progress';
+}
+
+function renderSingleDisplay(snap) {
+  const conn = $('displayConnect');
+  if (conn) conn.style.display = 'none';
+  displayBoard.classList.add('show');
+  dRoundWrap.style.display = '';
+  dGameLabel.textContent = snap.gameLabel || 'Game';
+  dRound.textContent = snap.round || 1;
+  dTotalRounds.textContent = snap.totalRounds || 1;
+  dBall.textContent = snap.ball || 1;
+
+  const players = snap.players || [];
+  const special = DEFS[snap.game] ? DEFS[snap.game].special : null;
+  const totals = players.map(p => ({ name: p, total: playerTotalFromSnap(snap, p) }))
+    .sort((a, b) => b.total - a.total);
+  const leader = totals.length ? totals[0] : null;
+  const turnName = snap.status === 'live' ? (players[snap.currentPlayer] || '') : '';
+
+  if (snap.status === 'finished') {
+    dWinner.classList.add('show');
+    dWinnerName.textContent = (snap.winner || (leader && leader.name) || '') + ' · ' + (snap.winnerScore != null ? snap.winnerScore : '') + ' pts';
+    if (!window._confettied) { window._confettied = true; spawnConfetti(); }
+  } else {
+    dWinner.classList.remove('show');
+    window._confettied = false;
+  }
+
+  dStandings.innerHTML = totals.map((t, i) => {
+    const isLeader = t.total > 0 && leader && t.name === leader.name;
+    const isTurn = t.name === turnName && snap.status === 'live';
+    if (snap.game === 'pigs') {
+      const eliminated = (snap.pigsEliminated || []).includes(t.name);
+      return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''} ${eliminated ? 'eliminated' : ''}">
+        <div class="d-rank">${eliminated ? '💀' : i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
+        <div class="d-name">${esc(getDisplayName(t.name))}${eliminated ? ' <span style="color:#ff4757;font-size:0.7em">ELIMINATED</span>' : ''}<div class="d-rounds">${eliminated ? 'Eliminated' : roundsHistory(snap, t.name)}</div></div>
+        <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
+      </div>`;
+    }
+    const balls = currentRoundBalls(snap, t.name);
+    const roundTotal = balls.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+    return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
+      <div class="d-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
+      <div class="d-name">${esc(getDisplayName(t.name))}<div class="d-rounds">${roundsHistory(snap, t.name)}</div></div>
+      <div class="d-balls">${ballsHtml(balls, special)}</div>
+      <div class="d-roundtotal">Rd ${roundTotal}</div>
+      <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
+    </div>`;
+  }).join('');
+
+  if (snap.game === 'pigs') {
+    dFooter.innerHTML = turnName
+      ? `🎯 <span class="f-name">${esc(getDisplayName(turnName))}</span> is up · Turn score: ${snap.pigsTurnScore || 0}`
+      : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
+  } else {
+    dFooter.innerHTML = turnName
+      ? `🎯 <span class="f-name">${esc(getDisplayName(turnName))}</span> is up · Ball ${snap.ball}`
+      : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
+  }
 }
 
 function playerTotalFromSnap(snap, p) {
@@ -1581,70 +1767,7 @@ function esc(s) {
 }
 
 function renderDisplay(snap) {
-  const conn = $('displayConnect');
-  conn.style.display = 'none';
-  displayBoard.classList.add('show');
-
-  dGameLabel.textContent = snap.gameLabel || 'Game';
-
-  if (snap.game === 'pigs') {
-    dRoundWrap.innerHTML = `Turn <b id="dRound">${snap.pigsCurrentPlayer != null ? (snap.pigsCurrentPlayer + 1) : 1}</b> · Score: <b>${snap.pigsTurnScore || 0}</b>`;
-  } else {
-    dRoundWrap.innerHTML = `Round <b id="dRound">${snap.round || 1}</b>/<span id="dTotalRounds">${snap.totalRounds || 1}</span> · Ball <b id="dBall">${snap.ball || 1}</b>/4`;
-  }
-
-  const players = snap.players || [];
-  const totals = players.map(p => ({ name: p, total: playerTotalFromSnap(snap, p) }))
-    .sort((a, b) => b.total - a.total);
-  const leader = totals.length ? totals[0] : null;
-  const turnName = snap.status === 'live' ? (players[snap.currentPlayer] || '') : '';
-
-  if (snap.status === 'finished') {
-    dWinner.classList.add('show');
-    dWinnerName.textContent = (snap.winner || (leader && leader.name) || '') + ' · ' + (snap.winnerScore != null ? snap.winnerScore : '') + ' pts';
-    if (!window._confettied) { window._confettied = true; spawnConfetti(); }
-  } else {
-    dWinner.classList.remove('show');
-    window._confettied = false;
-  }
-
-  if (snap.game === 'pigs') {
-    const eliminated = snap.pigsEliminated || [];
-    dStandings.innerHTML = totals.map((t, i) => {
-      const isLeader = t.total > 0 && leader && t.name === leader.name;
-      const isTurn = t.name === turnName && snap.status === 'live';
-      const isElim = eliminated.includes(t.name);
-      return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}" ${isElim ? 'style="opacity:0.4"' : ''}>
-        <div class="d-rank">${isElim ? '💀' : i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
-        <div class="d-name">${esc(t.name)}<div class="d-rounds">${isElim ? 'Eliminated' : roundsHistory(snap, t.name)}</div></div>
-        <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
-      </div>`;
-    }).join('');
-  } else {
-    dStandings.innerHTML = totals.map((t, i) => {
-      const isLeader = t.total > 0 && leader && t.name === leader.name;
-      const isTurn = t.name === turnName && snap.status === 'live';
-      const balls = currentRoundBalls(snap, t.name);
-      const roundTotal = balls.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
-      return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
-        <div class="d-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
-        <div class="d-name">${esc(t.name)}<div class="d-rounds">${roundsHistory(snap, t.name)}</div></div>
-        <div class="d-balls">${ballsHtml(balls, DEFS[snap.game] ? DEFS[snap.game].special : null)}</div>
-        <div class="d-roundtotal">Rd ${roundTotal}</div>
-        <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
-      </div>`;
-    }).join('');
-  }
-
-  if (snap.game === 'pigs') {
-    dFooter.innerHTML = turnName
-      ? `🎯 <span class="f-name">${esc(turnName)}</span> is up · Turn score: ${snap.pigsTurnScore || 0}`
-      : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
-  } else {
-    dFooter.innerHTML = turnName
-      ? `🎯 <span class="f-name">${esc(turnName)}</span> is up · Ball ${snap.ball}`
-      : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
-  }
+  renderSingleDisplay(snap);
 }
 
 async function requestWakeLock() {
@@ -1848,7 +1971,7 @@ function buildCarousel() {
       const sc = state.scores[p];
       const isElim = sc && sc.eliminated;
       return `<div class="player-card" data-i="${i}">
-        <div class="name">${p}</div>
+        <div class="name">${getDisplayName(p)}</div>
         <div class="total">total: <span id="total_${i}">${pigsGetPlayerTotal(p)}</span></div>
         <div class="pigs-header" id="pigsHeader_${i}">Turn: <span class="turn-score">0</span> pts · Throws: 0</div>
         <div class="pig-select" id="pigsSelect_${i}">
@@ -1928,7 +2051,7 @@ function buildCarousel() {
 
   carousel.innerHTML = state.players.map((p, i) =>
     `<div class="player-card" data-i="${i}">
-      <div class="name">${p}</div>
+      <div class="name">${getDisplayName(p)}</div>
       <div class="total">total: <span id="total_${i}">0</span></div>
       <div class="ball-status">Round ${state.currentRound} · Ball <span class="ball-num" id="bnum_${i}">1</span>/${BALLS_PER_ROUND}</div>
       <div class="ball-dots" id="bdots_${i}"></div>
@@ -2137,7 +2260,7 @@ function renderLeaderboard() {
       const isTurn = t.name === state.players[state.currentPlayer];
       let row = `<tr class="${isLeader ? 'leader' : ''}" ${t.eliminated ? 'style="opacity:0.4"' : ''}>`;
       row += `<td class="lb-rank">${t.eliminated ? '💀' : isLeader ? '🥇' : i + 1}</td>`;
-      row += `<td class="lb-name">${t.name}${t.eliminated ? ' <span style="color:var(--danger)">(out)</span>' : ''}</td>`;
+      row += `<td class="lb-name">${getDisplayName(t.name)}${t.eliminated ? ' <span style="color:var(--danger)">(out)</span>' : ''}</td>`;
       row += `<td class="lb-ball">${t.turns}</td>`;
       row += `<td class="lb-total">${t.total}</td>`;
       row += '</tr>';
@@ -2176,7 +2299,7 @@ function renderLeaderboard() {
 
     let row = `<tr class="${isLeader ? 'leader' : ''}">`;
     row += `<td class="lb-rank">${isLeader ? '🥇' : i + 1}</td>`;
-    row += `<td class="lb-name">${p}</td>`;
+    row += `<td class="lb-name">${getDisplayName(p)}</td>`;
 
     for (let b = 0; b < BALLS_PER_ROUND; b++) {
       const val = getBallScore(p, ri, b);
