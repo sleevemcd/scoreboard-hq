@@ -1,9 +1,12 @@
 services:
   scoreboard:
-    image: nginx:alpine
+    build: .
     container_name: scoreboard-hq
     restart: unless-stopped
     ports:
       - "1212:80"
     volumes:
-      - ./:/usr/share/nginx/html:ro
+      - scoreboard-data:/data
+
+volumes:
+  scoreboard-data:

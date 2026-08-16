@@ -14,10 +14,12 @@ else
   cd "$DIR" && git pull
 fi
 
-echo "== Making files readable by nginx (container user) =="
-chmod -R a+rX "$DIR"
+echo "== Stopping old container (if running) =="
+cd "$DIR" && docker compose down 2>/dev/null || true
 
-echo "== Starting container =="
+echo "== Building and starting container =="
 cd "$DIR" && docker compose up -d --build
 
-echo "Done. Open http://<nas-ip>:1212/scoreboard.html"
+echo ""
+echo "Done! Open http://<nas-ip>:1212/"
+echo "Data is saved in a Docker volume and persists across updates."

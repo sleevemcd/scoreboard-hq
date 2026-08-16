@@ -502,6 +502,63 @@ body.display-mode .scoreboard { display: none !important; }
   min-height: 3em;
 }
 .d-footer .f-name { color: #00ff88; }
+
+/* ─── Pass the Pigs ─── */
+.pig-select { display: flex; gap: 12px; margin: 8px 0; }
+.pig-col { flex: 1; }
+.pig-col-label { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; text-align: center; }
+.pig-btn {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; padding: 8px 10px; margin-bottom: 4px;
+  border: 2px solid var(--surface2); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-dim); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.pig-btn .pig-pts { font-size: 11px; color: var(--text-dimmer); }
+.pig-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(0,255,136,0.08); }
+.pig-special { display: flex; gap: 6px; margin: 8px 0; }
+.pig-special button {
+  flex: 1; padding: 8px; border: 2px solid var(--surface2); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-dim); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.pig-special button.pigout { border-color: #ff6b35; color: #ff6b35; }
+.pig-special button.pigout:hover { background: rgba(255,107,53,0.1); }
+.pig-special button.oinker { border-color: var(--danger); color: var(--danger); }
+.pig-special button.oinker:hover { background: rgba(255,71,87,0.1); }
+.pig-special button.piggyback { border-color: #a855f7; color: #a855f7; }
+.pig-special button.piggyback:hover { background: rgba(168,85,247,0.1); }
+.throw-info {
+  text-align: center; padding: 8px; margin: 6px 0;
+  background: var(--surface2); border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--text);
+}
+.throw-info .throw-score { font-size: 18px; font-weight: 800; color: var(--primary); }
+.throw-info .turn-total { font-size: 14px; color: var(--accent); margin-top: 2px; }
+.throw-actions { display: flex; gap: 8px; margin-top: 8px; }
+.throw-actions button {
+  flex: 1; padding: 12px; border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: all .15s;
+}
+.btn-throw { background: var(--surface2); color: var(--text); }
+.btn-throw:hover { background: #333355; }
+.btn-bank { background: var(--primary); color: var(--bg); }
+.btn-bank:hover { background: var(--primary-dim); }
+.btn-bank:disabled { opacity: 0.4; cursor: not-allowed; }
+.pigs-header { font-size: 13px; color: var(--text-dim); text-align: center; padding: 4px 0; }
+.pigs-header .turn-score { color: var(--accent); font-weight: 700; }
+.turn-history { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.turn-history .th-item {
+  padding: 3px 8px; background: var(--surface2); border-radius: 12px;
+  font-size: 11px; color: var(--text-dim);
+}
+.turn-history .th-item .th-pts { color: var(--primary); font-weight: 700; }
+.eliminated-overlay {
+  position: absolute; inset: 0; background: rgba(15,15,26,0.85);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; color: var(--danger);
+  border-radius: var(--radius); z-index: 5;
+}
 </style>
 </head>
 <body>
@@ -510,13 +567,14 @@ body.display-mode .scoreboard { display: none !important; }
   <!-- Setup -->
   <div class="setup" id="setup">
     <h1>Scoreboard HQ</h1>
-    <p>Chip &amp; Stick · Cornhole · anything</p>
+    <p>Chip &amp; Stick · Cornhole · Pass the Pigs</p>
     <div class="storage-warn" id="storageWarn" style="display:none">⚠️ Storage is blocked in this browser — players &amp; history won't persist between visits.</div>
     <div class="section">
       <label>Game</label>
       <div class="game-select" id="gameSelect">
         <button data-game="chipstick" class="active">Chip &amp; Stick</button>
         <button data-game="cornhole">Cornhole</button>
+        <button data-game="pigs">🐷 Pass the Pigs</button>
       </div>
     </div>
     <div class="section">
@@ -556,7 +614,7 @@ body.display-mode .scoreboard { display: none !important; }
   <!-- Game -->
   <div class="game" id="game">
     <div class="header">
-      <div class="round-info">
+      <div class="round-info" id="headerInfo">
         Round <span class="r" id="roundNum">1</span>/<span id="totalRounds">9</span> ·
         Ball <span class="b" id="ballNum">1</span>/<span id="totalBalls">4</span>
       </div>
@@ -623,7 +681,7 @@ body.display-mode .scoreboard { display: none !important; }
       <div class="d-game" id="dGameLabel">—</div>
       <div class="d-live"><span class="dot"></span> LIVE</div>
       <div class="d-spacer"></div>
-      <div class="d-round">Round <b id="dRound">1</b>/<span id="dTotalRounds">9</span> · Ball <b id="dBall">1</b>/4</div>
+      <div class="d-round" id="dRoundWrap">Round <b id="dRound">1</b>/<span id="dTotalRounds">9</span> · Ball <b id="dBall">1</b>/4</div>
     </header>
     <div class="d-winner" id="dWinner">🏆 <span class="w-name" id="dWinnerName"></span></div>
     <div id="dStandings"></div>
@@ -632,7 +690,6 @@ body.display-mode .scoreboard { display: none !important; }
 </div>
 
 <script>
-// ─── Constants ───
 const BALLS_PER_ROUND = 4;
 
 const DEFS = {
@@ -656,9 +713,25 @@ const DEFS = {
     ],
     special: 3,
   },
+  pigs: {
+    label: 'Pass the Pigs',
+    buttons: [],
+    special: null,
+  },
 };
 
-// ─── State ───
+const PIG_POSITIONS = {
+  sider:         { label: 'Sider',         pts: 1  },
+  razorback:     { label: 'Razorback',     pts: 5  },
+  trotter:       { label: 'Trotter',       pts: 5  },
+  snouter:       { label: 'Snouter',       pts: 10 },
+  leaningJowler: { label: 'Leaning Jowler', pts: 15 },
+};
+
+const PIG_DOUBLES = {
+  sider: 1, razorback: 20, trotter: 20, snouter: 40, leaningJowler: 60,
+};
+
 let state = {
   game: 'chipstick',
   players: [],
@@ -670,10 +743,19 @@ let state = {
   scores: {},
 };
 
+let pigsState = {
+  pig1: null,
+  pig2: null,
+  turnScore: 0,
+  turnThrows: [],
+  eliminated: false,
+};
+
 let touchStartX = 0, touchStartY = 0, touchDeltaX = 0, isDragging = false;
 let confettiTimeout = null;
 
-// ─── DOM ───
+let apiAvailable = false;
+
 const $ = id => document.getElementById(id);
 const setup = $('setup');
 const game = $('game');
@@ -722,13 +804,14 @@ const dWinner = $('dWinner');
 const dWinnerName = $('dWinnerName');
 const dStandings = $('dStandings');
 const dFooter = $('dFooter');
+const dRoundWrap = $('dRoundWrap');
+const headerInfo = $('headerInfo');
 
 const DISPLAY_MODE = new URLSearchParams(location.search).has('display');
 
 const STORAGE_KEY = 'scoreboard_hq_history';
 const PLAYERS_KEY = 'scoreboard_hq_players';
 
-// ─── Safe storage (falls back: localStorage → cookie → memory) ───
 let storageOK = true;
 let storageMode = detectStorageMode();
 const COOKIE_PREFIX = 'sb_';
@@ -752,6 +835,14 @@ function detectStorageMode() {
 }
 
 function lsGet(key) {
+  if (apiAvailable) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api.php?route=' + encodeURIComponent(key), false);
+      xhr.send();
+      if (xhr.status === 200 && xhr.responseText) return xhr.responseText;
+    } catch {}
+  }
   if (storageMode === 'local') {
     try { return localStorage.getItem(key); } catch {}
   } else if (storageMode === 'cookie') {
@@ -764,6 +855,15 @@ function lsGet(key) {
 }
 
 function lsSet(key, val) {
+  if (apiAvailable) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api.php?route=' + encodeURIComponent(key), false);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(val);
+      if (xhr.status === 200) return true;
+    } catch {}
+  }
   if (storageMode === 'local') {
     try { localStorage.setItem(key, val); return true; } catch {}
   } else if (storageMode === 'cookie') {
@@ -776,11 +876,39 @@ function lsSet(key, val) {
 }
 
 function lsRemove(key) {
+  if (apiAvailable) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('DELETE', '/api.php?route=' + encodeURIComponent(key), false);
+      xhr.send();
+    } catch {}
+  }
   if (storageMode === 'local') {
     try { localStorage.removeItem(key); } catch {}
   } else if (storageMode === 'cookie') {
     try { document.cookie = COOKIE_PREFIX + key + '=;path=/;max-age=0'; } catch {}
   }
+}
+
+async function apiPost(route, data) {
+  if (!apiAvailable) return false;
+  try {
+    const r = await fetch('/api.php?route=' + encodeURIComponent(route), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function apiGet(route) {
+  if (!apiAvailable) return null;
+  try {
+    const r = await fetch('/api.php?route=' + encodeURIComponent(route));
+    if (!r.ok) return null;
+    return await r.text();
+  } catch { return null; }
 }
 
 function checkStorage() {
@@ -798,7 +926,6 @@ function checkStorage() {
 
 let gameInProgress = false;
 
-// ─── Player roster (persisted) ───
 let saved = loadPlayers();
 let roster = saved.players;
 let selPlayers = saved.selected;
@@ -868,7 +995,6 @@ function addPlayer() {
 
 function updateStartBtn() { startBtn.disabled = selPlayers.length < 2; }
 
-// ─── Setup handlers ───
 let gameBtns = document.querySelectorAll('#gameSelect button');
 gameBtns.forEach(b => b.addEventListener('click', () => {
   gameBtns.forEach(x => x.classList.remove('active'));
@@ -894,12 +1020,26 @@ startBtn.addEventListener('click', () => {
   state.currentPlayer = 0;
   state.scores = {};
   state.players.forEach(p => { state.scores[p] = []; });
+
+  if (state.game === 'pigs') {
+    state.totalRounds = 999;
+    pigsState = {
+      pig1: null,
+      pig2: null,
+      turnScore: 0,
+      turnThrows: [],
+      eliminated: false,
+    };
+    state.players.forEach(p => { state.scores[p] = { total: 0, turns: [] }; });
+  } else {
+    state.players.forEach(p => { state.scores[p] = []; });
+  }
+
   gameInProgress = true;
   showGame();
   pushLive();
 });
 
-// ─── Lifecycle / navigation ───
 function setActiveTab(view) {
   const map = { setup: tabSetup, game: tabGame, leaderboard: tabStatus, stats: tabStats };
   Object.values(map).forEach(t => t.classList.remove('active'));
@@ -942,30 +1082,48 @@ function enterStats() {
   show('stats');
 }
 
+function pigsGetPlayerTotal(p) {
+  if (state.game === 'pigs') {
+    const sc = state.scores[p];
+    return sc ? sc.total : 0;
+  }
+  return getPlayerTotal(p);
+}
+
 function enterResults() {
   const totals = state.players.map(p => ({
     name: p,
-    total: getPlayerTotal(p),
-    roundTotals: getPlayerRoundTotals(p),
+    total: pigsGetPlayerTotal(p),
+    roundTotals: state.game === 'pigs' ? [] : getPlayerRoundTotals(p),
   })).sort((a, b) => b.total - a.total);
   const win = totals[0];
   winnerName.textContent = win.name;
-  winnerScore.textContent = `${win.total} pts · ${state.totalRounds} rounds`;
-  scorecard.innerHTML = totals.map((t, i) =>
-    `<div class="row">
+  if (state.game === 'pigs') {
+    winnerScore.textContent = `First to 100!`;
+  } else {
+    winnerScore.textContent = `${win.total} pts · ${state.totalRounds} rounds`;
+  }
+  scorecard.innerHTML = totals.map((t, i) => {
+    let detail = '';
+    if (state.game === 'pigs') {
+      const eliminated = state.scores[t.name] && state.scores[t.name].eliminated;
+      detail = eliminated ? '<span style="color:var(--danger)">Eliminated</span>' : '';
+    } else {
+      detail = `<div class="rounds-detail">Rds: ${t.roundTotals.join(' · ')}</div>`;
+    }
+    return `<div class="row">
       <div class="rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</div>
       <div class="pname">${t.name}</div>
-      <div class="rounds-detail">Rds: ${t.roundTotals.join(' · ')}</div>
+      ${detail}
       <div class="ptotal">${t.total}</div>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
   saveGame();
   gameInProgress = false;
   pushResult();
   show('results');
 }
 
-// ─── Game history & stats ───
 function loadGames() {
   const raw = lsGet(STORAGE_KEY);
   try { return JSON.parse(raw) || []; }
@@ -974,8 +1132,17 @@ function loadGames() {
 
 function saveGame() {
   const games = loadGames();
-  const totals = state.players.map(p => ({ name: p, total: getPlayerTotal(p) }));
-  const winner = totals.reduce((a, b) => a.total >= b.total ? a : b);
+  let totals, winner;
+  if (state.game === 'pigs') {
+    totals = state.players.map(p => ({ name: p, total: pigsGetPlayerTotal(p) }));
+    winner = totals.reduce((a, b) => a.total >= b.total ? a : b);
+  } else {
+    totals = state.players.map(p => ({ name: p, total: getPlayerTotal(p) }));
+    winner = totals.reduce((a, b) => a.total >= b.total ? a : b);
+  }
+  const turnCount = state.game === 'pigs'
+    ? (state.scores[state.players[0]] ? state.scores[state.players[0]].turns.length : 0)
+    : state.totalRounds;
   games.push({
     id: Date.now(),
     date: new Date().toLocaleDateString(),
@@ -983,8 +1150,8 @@ function saveGame() {
     game: state.game,
     gameLabel: DEFS[state.game].label,
     players: [...state.players],
-    totalRounds: state.totalRounds,
-    ballsPerRound: BALLS_PER_ROUND,
+    totalRounds: turnCount,
+    ballsPerRound: state.game === 'pigs' ? 0 : BALLS_PER_ROUND,
     scores: JSON.parse(JSON.stringify(state.scores)),
     totals: totals.map(t => t.total),
     winner: winner.name,
@@ -1005,18 +1172,25 @@ function getPlayerStats(playerName, games) {
   mine.forEach(g => {
     const idx = g.players.indexOf(playerName);
     totalPts += g.totals[idx] || 0;
-    const ps = g.scores[playerName] || [];
-    ps.forEach(r => {
-      if (!r) return;
-      const rt = r.reduce((a, b) => a + (b || 0), 0);
-      if (rt > bestRound) bestRound = rt;
-      r.forEach(b => {
-        if (b === undefined) return;
-        totalBalls++;
-        if (b === 0) obs++;
-        else { const def = DEFS[g.game]; if (def && b === def.special) specials++; }
+    if (g.game === 'pigs') {
+      const sc = g.scores[playerName];
+      if (sc && sc.turns) {
+        sc.turns.forEach(t => { if (t > bestRound) bestRound = t; });
+      }
+    } else {
+      const ps = g.scores[playerName] || [];
+      ps.forEach(r => {
+        if (!r) return;
+        const rt = r.reduce((a, b) => a + (b || 0), 0);
+        if (rt > bestRound) bestRound = rt;
+        r.forEach(b => {
+          if (b === undefined) return;
+          totalBalls++;
+          if (b === 0) obs++;
+          else { const def = DEFS[g.game]; if (def && b === def.special) specials++; }
+        });
       });
-    });
+    }
   });
   return {
     gamesPlayed: mine.length, wins, winRate: Math.round(wins / mine.length * 100),
@@ -1033,12 +1207,10 @@ function renderStats() {
     return;
   }
 
-  // Collect all unique player names across all games
   const allPlayers = [...new Set(games.flatMap(g => g.players))];
 
   let html = '';
 
-  // Player stats section
   html += '<div class="stats-section"><div class="section-title">Player Stats</div><div class="stat-cards">';
   allPlayers.forEach(name => {
     const s = getPlayerStats(name, games);
@@ -1061,11 +1233,10 @@ function renderStats() {
   });
   html += '</div></div>';
 
-  // Game history section
   html += '<div class="stats-section"><div class="section-title">Game History (' + games.length + ')</div>';
   const rev = [...games].reverse();
   rev.forEach((g, ri) => {
-    const isExpanded = ri === 0; // latest expanded by default
+    const isExpanded = ri === 0;
     html += `<div class="game-entry" data-idx="${rev.length - 1 - ri}">
       <div class="ge-top">
         <div><div class="ge-tag">${g.gameLabel} · ${g.date} ${g.time}</div>
@@ -1083,7 +1254,7 @@ function renderStats() {
           return `<div class="ge-row"><span class="ge-rp">${p}</span><span class="ge-rs">${g.totals[idx]} pts</span></div>`;
         }).join('')}
         <div class="ge-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--surface2);color:var(--text-dimmer);font-size:10px">
-          ${g.totalRounds} rounds · ${g.ballsPerRound} balls/round
+          ${g.totalRounds} ${g.game === 'pigs' ? 'turns' : 'rounds'} · ${g.ballsPerRound > 0 ? g.ballsPerRound + ' balls/round' : 'Pigs'}
         </div>
       </div>
     </div>`;
@@ -1092,7 +1263,6 @@ function renderStats() {
 
   statsScroll.innerHTML = html;
 
-  // Expand/collapse on click
   statsScroll.querySelectorAll('.game-entry').forEach(el => {
     el.addEventListener('click', () => {
       const detail = el.querySelector('.ge-detail');
@@ -1105,11 +1275,6 @@ function renderStats() {
   });
 }
 
-function enterStats() {
-  show('stats');
-}
-
-// ─── Tab bar navigation ───
 function goTo(view) {
   if (view === 'setup') backToSetup();
   else if (view === 'game') showGame();
@@ -1125,9 +1290,9 @@ statsClearBtn.addEventListener('click', () => {
     renderStats();
   }
 });
+const lbBackBtn = $('lbBackBtn');
 lbBackBtn.addEventListener('click', showGame);
 
-// ─── Live Display (controller side) ───
 const LIVE_KEY = 'scoreboard_hq_live';
 const LIVECODE_KEY = 'scoreboard_hq_livecode';
 let liveEnabled = false;
@@ -1166,6 +1331,12 @@ function pushLive() {
     scores: JSON.parse(JSON.stringify(state.scores)),
     status: 'live',
   };
+  if (state.game === 'pigs') {
+    payload.pigsTurnScore = pigsState.turnScore;
+    payload.pigsTurnThrows = [...pigsState.turnThrows];
+    payload.pigsCurrentPlayer = state.currentPlayer;
+    payload.pigsEliminated = state.players.filter(p => state.scores[p] && state.scores[p].eliminated);
+  }
   clearTimeout(livePushTimer);
   livePushTimer = setTimeout(() => {
     fetch('https://ntfy.sh/' + liveCode(), {
@@ -1177,7 +1348,7 @@ function pushLive() {
 
 function pushResult() {
   if (!liveEnabled || state.players.length === 0) return;
-  const totals = state.players.map(p => ({ name: p, total: getPlayerTotal(p) }));
+  const totals = state.players.map(p => ({ name: p, total: pigsGetPlayerTotal(p) }));
   const winner = totals.reduce((a, b) => a.total >= b.total ? a : b);
   const payload = {
     type: 'game', t: Date.now(), code: liveCode(),
@@ -1246,7 +1417,6 @@ function fallbackCopy(text, done) {
 }
 liveCopyBtn.addEventListener('click', () => copyText(liveUrl()));
 
-// ─── Live Display (viewer side) ───
 function initDisplay() {
   document.body.classList.add('display-mode');
   const code = new URLSearchParams(location.search).get('code');
@@ -1338,6 +1508,10 @@ function renderWaiting() {
 }
 
 function playerTotalFromSnap(snap, p) {
+  if (snap.game === 'pigs') {
+    const sc = snap.scores[p];
+    return sc ? (sc.total || 0) : 0;
+  }
   const s = snap.scores[p] || [];
   let t = 0;
   for (const r of s) if (r) for (const b of r) if (typeof b === 'number') t += b;
@@ -1345,11 +1519,17 @@ function playerTotalFromSnap(snap, p) {
 }
 
 function currentRoundBalls(snap, p) {
+  if (snap.game === 'pigs') return [];
   const ri = (snap.round || 1) - 1;
   return (snap.scores[p] || [])[ri] || [];
 }
 
 function roundsHistory(snap, p) {
+  if (snap.game === 'pigs') {
+    const sc = snap.scores[p];
+    if (!sc || !sc.turns) return 'Turns: —';
+    return 'Turns: ' + (sc.turns.length ? sc.turns.join(' · ') : '—');
+  }
   const s = snap.scores[p] || [];
   const rt = s.map(r => r ? r.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) : 0);
   return 'Rounds: ' + (rt.length ? rt.join(' · ') : '—');
@@ -1379,12 +1559,14 @@ function renderDisplay(snap) {
   displayBoard.classList.add('show');
 
   dGameLabel.textContent = snap.gameLabel || 'Game';
-  dRound.textContent = snap.round || 1;
-  dTotalRounds.textContent = snap.totalRounds || 1;
-  dBall.textContent = snap.ball || 1;
+
+  if (snap.game === 'pigs') {
+    dRoundWrap.innerHTML = `Turn <b id="dRound">${snap.pigsCurrentPlayer != null ? (snap.pigsCurrentPlayer + 1) : 1}</b> · Score: <b>${snap.pigsTurnScore || 0}</b>`;
+  } else {
+    dRoundWrap.innerHTML = `Round <b id="dRound">${snap.round || 1}</b>/<span id="dTotalRounds">${snap.totalRounds || 1}</span> · Ball <b id="dBall">${snap.ball || 1}</b>/4`;
+  }
 
   const players = snap.players || [];
-  const special = DEFS[snap.game] ? DEFS[snap.game].special : null;
   const totals = players.map(p => ({ name: p, total: playerTotalFromSnap(snap, p) }))
     .sort((a, b) => b.total - a.total);
   const leader = totals.length ? totals[0] : null;
@@ -1399,23 +1581,43 @@ function renderDisplay(snap) {
     window._confettied = false;
   }
 
-  dStandings.innerHTML = totals.map((t, i) => {
-    const isLeader = t.total > 0 && leader && t.name === leader.name;
-    const isTurn = t.name === turnName && snap.status === 'live';
-    const balls = currentRoundBalls(snap, t.name);
-    const roundTotal = balls.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
-    return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
-      <div class="d-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
-      <div class="d-name">${esc(t.name)}<div class="d-rounds">${roundsHistory(snap, t.name)}</div></div>
-      <div class="d-balls">${ballsHtml(balls, special)}</div>
-      <div class="d-roundtotal">Rd ${roundTotal}</div>
-      <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
-    </div>`;
-  }).join('');
+  if (snap.game === 'pigs') {
+    const eliminated = snap.pigsEliminated || [];
+    dStandings.innerHTML = totals.map((t, i) => {
+      const isLeader = t.total > 0 && leader && t.name === leader.name;
+      const isTurn = t.name === turnName && snap.status === 'live';
+      const isElim = eliminated.includes(t.name);
+      return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}" ${isElim ? 'style="opacity:0.4"' : ''}>
+        <div class="d-rank">${isElim ? '💀' : i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
+        <div class="d-name">${esc(t.name)}<div class="d-rounds">${isElim ? 'Eliminated' : roundsHistory(snap, t.name)}</div></div>
+        <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
+      </div>`;
+    }).join('');
+  } else {
+    dStandings.innerHTML = totals.map((t, i) => {
+      const isLeader = t.total > 0 && leader && t.name === leader.name;
+      const isTurn = t.name === turnName && snap.status === 'live';
+      const balls = currentRoundBalls(snap, t.name);
+      const roundTotal = balls.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+      return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
+        <div class="d-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
+        <div class="d-name">${esc(t.name)}<div class="d-rounds">${roundsHistory(snap, t.name)}</div></div>
+        <div class="d-balls">${ballsHtml(balls, DEFS[snap.game] ? DEFS[snap.game].special : null)}</div>
+        <div class="d-roundtotal">Rd ${roundTotal}</div>
+        <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
+      </div>`;
+    }).join('');
+  }
 
-  dFooter.innerHTML = turnName
-    ? `🎯 <span class="f-name">${esc(turnName)}</span> is up · Ball ${snap.ball}`
-    : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
+  if (snap.game === 'pigs') {
+    dFooter.innerHTML = turnName
+      ? `🎯 <span class="f-name">${esc(turnName)}</span> is up · Turn score: ${snap.pigsTurnScore || 0}`
+      : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
+  } else {
+    dFooter.innerHTML = turnName
+      ? `🎯 <span class="f-name">${esc(turnName)}</span> is up · Ball ${snap.ball}`
+      : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
+  }
 }
 
 async function requestWakeLock() {
@@ -1429,8 +1631,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// ─── Data helpers ───
 function getPlayerTotal(p) {
+  if (state.game === 'pigs') {
+    const sc = state.scores[p];
+    return sc ? sc.total : 0;
+  }
   const rounds = state.scores[p] || [];
   let t = 0;
   for (const r of rounds) if (r) for (const b of r) if (b !== undefined) t += b;
@@ -1449,8 +1654,251 @@ function getBallScore(p, roundIdx, ballIdx) {
   return r[ballIdx];
 }
 
-// ─── Carousel ───
+function calcPigsThrow(pig1, pig2) {
+  if (!pig1 || !pig2) return 0;
+  if (pig1 === pig2) return PIG_DOUBLES[pig1];
+  return PIG_POSITIONS[pig1].pts + PIG_POSITIONS[pig2].pts;
+}
+
+function selectPig(pigNum, position) {
+  if (pigNum === 1) pigsState.pig1 = position;
+  else pigsState.pig2 = position;
+  updatePigsUI();
+}
+
+function pigsThrow() {
+  if (!pigsState.pig1 || !pigsState.pig2) return;
+  const pts = calcPigsThrow(pigsState.pig1, pigsState.pig2);
+  pigsState.turnScore += pts;
+  pigsState.turnThrows.push(pts);
+  pigsState.pig1 = null;
+  pigsState.pig2 = null;
+  updatePigsUI();
+  pushLive();
+}
+
+function pigsBank() {
+  if (!pigsState.pig1 && !pigsState.pig2 && pigsState.turnThrows.length === 0) return;
+  const p = state.players[state.currentPlayer];
+  const sc = state.scores[p];
+  if (pigsState.pig1 && pigsState.pig2) {
+    const pts = calcPigsThrow(pigsState.pig1, pigsState.pig2);
+    pigsState.turnScore += pts;
+    pigsState.turnThrows.push(pts);
+  }
+  sc.total += pigsState.turnScore;
+  sc.turns.push(pigsState.turnScore);
+  pigsState.turnScore = 0;
+  pigsState.turnThrows = [];
+  pigsState.pig1 = null;
+  pigsState.pig2 = null;
+
+  if (sc.total >= 100) {
+    setTimeout(enterResults, 500);
+    return;
+  }
+
+  advancePigsPlayer();
+  updatePigsUI();
+  pushLive();
+}
+
+function pigsSpecial(type) {
+  const p = state.players[state.currentPlayer];
+  const sc = state.scores[p];
+
+  if (type === 'pigout') {
+    pigsState.turnScore = 0;
+    pigsState.turnThrows = [];
+    pigsState.pig1 = null;
+    pigsState.pig2 = null;
+    advancePigsPlayer();
+  } else if (type === 'oinker') {
+    sc.total = 0;
+    pigsState.turnScore = 0;
+    pigsState.turnThrows = [];
+    pigsState.pig1 = null;
+    pigsState.pig2 = null;
+    advancePigsPlayer();
+  } else if (type === 'piggyback') {
+    sc.eliminated = true;
+    sc.total = 0;
+    pigsState.turnScore = 0;
+    pigsState.turnThrows = [];
+    pigsState.pig1 = null;
+    pigsState.pig2 = null;
+
+    const active = state.players.filter(pl => !state.scores[pl].eliminated);
+    if (active.length <= 1) {
+      setTimeout(enterResults, 500);
+      return;
+    }
+    advancePigsPlayer();
+  }
+
+  updatePigsUI();
+  pushLive();
+}
+
+function advancePigsPlayer() {
+  let next = state.currentPlayer;
+  let attempts = 0;
+  do {
+    next = (next + 1) % state.players.length;
+    attempts++;
+  } while (state.scores[state.players[next]].eliminated && attempts < state.players.length);
+  state.currentPlayer = next;
+  pigsState.pig1 = null;
+  pigsState.pig2 = null;
+}
+
+function updatePigsUI() {
+  if (state.game !== 'pigs') return;
+  const pi = state.currentPlayer;
+  const p = state.players[pi];
+  const sc = state.scores[p];
+
+  state.players.forEach((pl, i) => {
+    const total = pigsGetPlayerTotal(pl);
+    const el = document.getElementById('total_' + i);
+    if (el) {
+      const prev = parseInt(el.textContent) || 0;
+      el.textContent = total;
+      if (total !== prev) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+    }
+  });
+
+  const pigsHeader = document.getElementById('pigsHeader_' + pi);
+  if (pigsHeader) {
+    pigsHeader.innerHTML = `Turn: <span class="turn-score">${pigsState.turnScore}</span> pts · Throws: ${pigsState.turnThrows.length}`;
+  }
+
+  const pigsTurnInfo = document.getElementById('pigsTurnInfo_' + pi);
+  if (pigsTurnInfo) {
+    if (pigsState.pig1 && pigsState.pig2) {
+      const throwPts = calcPigsThrow(pigsState.pig1, pigsState.pig2);
+      pigsTurnInfo.innerHTML = `<div class="throw-score">${throwPts} pts</div><div class="turn-total">Turn total: ${pigsState.turnScore + throwPts}</div>`;
+    } else if (pigsState.pig1) {
+      pigsTurnInfo.innerHTML = `<div class="throw-score">Select Pig 2</div>`;
+    } else {
+      pigsTurnInfo.innerHTML = `<div class="throw-score">Select both pigs</div>`;
+    }
+  }
+
+  const bankBtn = document.getElementById('pigsBank_' + pi);
+  if (bankBtn) {
+    bankBtn.disabled = pigsState.turnThrows.length === 0 && (!pigsState.pig1 || !pigsState.pig2);
+  }
+
+  const pigBtns = document.querySelectorAll('#pigsSelect_' + pi + ' .pig-btn');
+  pigBtns.forEach(btn => {
+    const pNum = parseInt(btn.dataset.pig);
+    const pos = btn.dataset.pos;
+    const active = (pNum === 1 && pigsState.pig1 === pos) || (pNum === 2 && pigsState.pig2 === pos);
+    btn.classList.toggle('active', active);
+  });
+
+  const turnHist = document.getElementById('pigsHistory_' + pi);
+  if (turnHist) {
+    turnHist.innerHTML = pigsState.turnThrows.map(t =>
+      `<div class="th-item"><span class="th-pts">+${t}</span></div>`
+    ).join('');
+  }
+
+  const elimOverlay = document.getElementById('pigsElim_' + pi);
+  if (elimOverlay) {
+    elimOverlay.style.display = sc.eliminated ? 'flex' : 'none';
+  }
+
+  buildDots();
+  roundNum.textContent = state.currentPlayer + 1;
+  totalRounds.textContent = state.players.length;
+}
+
 function buildCarousel() {
+  if (state.game === 'pigs') {
+    carousel.innerHTML = state.players.map((p, i) => {
+      const sc = state.scores[p];
+      const isElim = sc && sc.eliminated;
+      return `<div class="player-card" data-i="${i}">
+        <div class="name">${p}</div>
+        <div class="total">total: <span id="total_${i}">${pigsGetPlayerTotal(p)}</span></div>
+        <div class="pigs-header" id="pigsHeader_${i}">Turn: <span class="turn-score">0</span> pts · Throws: 0</div>
+        <div class="pig-select" id="pigsSelect_${i}">
+          <div class="pig-col">
+            <div class="pig-col-label">Pig 1</div>
+            ${Object.entries(PIG_POSITIONS).map(([key, val]) =>
+              `<button class="pig-btn" data-pig="1" data-pos="${key}" data-pi="${i}">
+                <span>${val.label}</span><span class="pig-pts">${val.pts}pt${val.pts !== 1 ? 's' : ''}</span>
+              </button>`
+            ).join('')}
+          </div>
+          <div class="pig-col">
+            <div class="pig-col-label">Pig 2</div>
+            ${Object.entries(PIG_POSITIONS).map(([key, val]) =>
+              `<button class="pig-btn" data-pig="2" data-pos="${key}" data-pi="${i}">
+                <span>${val.label}</span><span class="pig-pts">${val.pts}pt${val.pts !== 1 ? 's' : ''}</span>
+              </button>`
+            ).join('')}
+          </div>
+        </div>
+        <div class="pig-special">
+          <button class="pigout" data-pi="${i}" data-special="pigout">Pig Out</button>
+          <button class="oinker" data-pi="${i}" data-special="oinker">Oinker</button>
+          <button class="piggyback" data-pi="${i}" data-special="piggyback">Piggy Back</button>
+        </div>
+        <div class="throw-info" id="pigsTurnInfo_${i}">
+          <div class="throw-score">Select both pigs</div>
+        </div>
+        <div class="throw-actions">
+          <button class="btn-throw" id="pigsThrow_${i}" data-pi="${i}">Throw Again</button>
+          <button class="btn-bank" id="pigsBank_${i}" data-pi="${i}" disabled>Bank & Pass</button>
+        </div>
+        <div class="turn-history" id="pigsHistory_${i}"></div>
+        <div class="eliminated-overlay" id="pigsElim_${i}" style="display:none">ELIMINATED</div>
+      </div>`;
+    }).join('');
+
+    document.querySelectorAll('.pig-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pi2 = parseInt(btn.dataset.pi);
+        const pigNum = parseInt(btn.dataset.pig);
+        const pos = btn.dataset.pos;
+        if (pi2 !== state.currentPlayer) return;
+        selectPig(pigNum, pos);
+      });
+    });
+
+    document.querySelectorAll('.pig-special button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pi2 = parseInt(btn.dataset.pi);
+        if (pi2 !== state.currentPlayer) return;
+        pigsSpecial(btn.dataset.special);
+      });
+    });
+
+    document.querySelectorAll('.btn-throw').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pi2 = parseInt(btn.dataset.pi);
+        if (pi2 !== state.currentPlayer) return;
+        pigsThrow();
+      });
+    });
+
+    document.querySelectorAll('.btn-bank').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pi2 = parseInt(btn.dataset.pi);
+        if (pi2 !== state.currentPlayer) return;
+        pigsBank();
+      });
+    });
+
+    updatePigsUI();
+    buildDots();
+    positionCarousel(false);
+    return;
+  }
+
   carousel.innerHTML = state.players.map((p, i) =>
     `<div class="player-card" data-i="${i}">
       <div class="name">${p}</div>
@@ -1468,6 +1916,7 @@ function buildCarousel() {
 }
 
 function buildActions(pi) {
+  if (state.game === 'pigs') return;
   const def = DEFS[state.game];
   const el = document.getElementById('actions_' + pi);
   el.innerHTML = def.buttons.map(b =>
@@ -1486,6 +1935,10 @@ function buildActions(pi) {
 }
 
 function updateUI() {
+  if (state.game === 'pigs') {
+    updatePigsUI();
+    return;
+  }
   const ri = state.currentRound - 1;
   const bi = state.currentBall - 1;
   state.players.forEach((p, i) => {
@@ -1566,6 +2019,15 @@ function updateHistory(pi) {
 }
 
 function buildDots() {
+  if (state.game === 'pigs') {
+    dots.innerHTML = state.players.map((p, i) => {
+      let cls = 'dot';
+      if (i === state.currentPlayer) cls += ' active';
+      else if (state.scores[p] && state.scores[p].eliminated) cls += ' done';
+      return `<div class="${cls}"></div>`;
+    }).join('');
+    return;
+  }
   dots.innerHTML = state.players.map((p, i) => {
     const ri = state.currentRound - 1;
     const bi = state.currentBall - 1;
@@ -1593,7 +2055,6 @@ function goToPlayer(idx) {
   pushLive();
 }
 
-// ─── Scoring ───
 function recordScore(pi, pts) {
   const p = state.players[pi];
   const ri = state.currentRound - 1;
@@ -1608,7 +2069,6 @@ function recordScore(pi, pts) {
 
   if (DEFS[state.game].special === pts) spawnConfetti();
 
-  // Check if all players have thrown the current ball
   const allDone = state.players.every(p2 => {
     const s = state.scores[p2] && state.scores[p2][ri];
     return s && s[bi] !== undefined;
@@ -1629,16 +2089,42 @@ function recordScore(pi, pts) {
   pushLive();
 }
 
-// ─── Leaderboard ───
 function renderLeaderboard() {
   const def = DEFS[state.game];
   lbTitle.textContent = def.label;
+
+  if (state.game === 'pigs') {
+    const sorted = state.players.map(p => ({
+      name: p,
+      total: pigsGetPlayerTotal(p),
+      eliminated: state.scores[p] && state.scores[p].eliminated,
+      turns: state.scores[p] ? (state.scores[p].turns || []).length : 0,
+    })).sort((a, b) => b.total - a.total);
+
+    let progHtml = `<div class="lp-info">Players: <span>${state.players.filter(p => !state.scores[p].eliminated).length}</span> active · Turn <span class="b">${state.currentPlayer + 1}</span></div>`;
+    lbProgress.innerHTML = progHtml;
+
+    let headHtml = '<tr><th>#</th><th>Player</th><th>Turns</th><th>Tot</th></tr>';
+    const rows = sorted.map((t, i) => {
+      const isLeader = t.total > 0 && sorted[0] && t.name === sorted[0].name;
+      const isTurn = t.name === state.players[state.currentPlayer];
+      let row = `<tr class="${isLeader ? 'leader' : ''}" ${t.eliminated ? 'style="opacity:0.4"' : ''}>`;
+      row += `<td class="lb-rank">${t.eliminated ? '💀' : isLeader ? '🥇' : i + 1}</td>`;
+      row += `<td class="lb-name">${t.name}${t.eliminated ? ' <span style="color:var(--danger)">(out)</span>' : ''}</td>`;
+      row += `<td class="lb-ball">${t.turns}</td>`;
+      row += `<td class="lb-total">${t.total}</td>`;
+      row += '</tr>';
+      return row;
+    }).join('');
+    lbTable.innerHTML = headHtml + rows;
+    return;
+  }
+
   const ri = state.currentRound - 1;
   const sorted = state.players.map(p => ({ name: p, total: getPlayerTotal(p) }))
     .sort((a, b) => b.total - a.total);
   const leaderName = sorted.length > 0 ? sorted[0].name : '';
 
-  // Progress indicator
   let progHtml = `<div class="lp-info">Round <span>${state.currentRound}</span>/${state.totalRounds} · Ball <span class="b">${state.currentBall}</span>/${BALLS_PER_ROUND}</div>`;
   progHtml += '<div class="lp-balls">';
   for (let b = 0; b < BALLS_PER_ROUND; b++) {
@@ -1651,7 +2137,6 @@ function renderLeaderboard() {
   progHtml += '</div>';
   lbProgress.innerHTML = progHtml;
 
-  // Build header based on balls per round
   let headHtml = '<tr><th>#</th><th>Player</th>';
   for (let b = 1; b <= BALLS_PER_ROUND; b++) headHtml += `<th>B${b}</th>`;
   headHtml += '<th>Rd</th><th>Tot</th></tr>';
@@ -1687,7 +2172,6 @@ function renderLeaderboard() {
   lbTable.innerHTML = headHtml + rows;
 }
 
-// ─── Swipe ───
 const wrap = document.querySelector('.carousel-wrap');
 wrap.addEventListener('touchstart', e => {
   touchStartX = e.touches[0].clientX;
@@ -1754,7 +2238,6 @@ wrap.addEventListener('mousedown', e => {
   document.addEventListener('mouseup', onUp);
 });
 
-// ─── Confetti ───
 function spawnConfetti() {
   const existing = document.querySelector('.confetti-container');
   if (existing) existing.remove();
@@ -1779,7 +2262,6 @@ function spawnConfetti() {
   confettiTimeout = setTimeout(() => { if (container.parentNode) container.remove(); }, 3000);
 }
 
-// ─── Keyboard ───
 document.addEventListener('keydown', e => {
   if (game.classList.contains('active')) {
     if (e.key === 'ArrowLeft') goToPlayer(state.currentPlayer - 1);
@@ -1787,15 +2269,23 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ─── Init ───
+async function initApi() {
+  try {
+    const r = await fetch('/api.php?route=ping');
+    if (r.ok) apiAvailable = true;
+  } catch {}
+}
+
 if (DISPLAY_MODE) {
   initDisplay();
 } else {
-  liveEnabled = lsGet(LIVE_KEY) === '1';
-  refreshLiveUI();
-  checkStorage();
-  renderRoster();
-  show('setup');
+  initApi().then(() => {
+    liveEnabled = lsGet(LIVE_KEY) === '1';
+    refreshLiveUI();
+    checkStorage();
+    renderRoster();
+    show('setup');
+  });
 }
 </script>
 </body>
