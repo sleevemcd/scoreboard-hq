@@ -353,6 +353,13 @@ body {
 .game-entry .ge-detail .ge-row { display: flex; justify-content: space-between; padding: 2px 0; }
 .game-entry .ge-detail .ge-row .ge-rp { font-weight: 600; }
 .game-entry .ge-detail .ge-row .ge-rs { color: var(--primary); font-weight: 700; }
+.game-entry .ge-delete {
+  width: 24px; height: 24px; border: none; border-radius: 50%;
+  background: transparent; color: var(--text-dimmer); font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s; flex-shrink: 0;
+}
+.game-entry .ge-delete:hover { background: rgba(255,71,87,0.15); color: var(--danger); }
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dimmer); font-size: 14px; line-height: 1.6; }
 .btn-secondary {
   padding: 12px; border: none; border-radius: var(--radius);
@@ -1130,6 +1137,13 @@ function loadGames() {
   catch { return []; }
 }
 
+function deleteGame(id) {
+  let games = loadGames();
+  games = games.filter(g => g.id !== id);
+  lsSet(STORAGE_KEY, JSON.stringify(games));
+  renderStats();
+}
+
 function saveGame() {
   const games = loadGames();
   let totals, winner;
@@ -1237,11 +1251,14 @@ function renderStats() {
   const rev = [...games].reverse();
   rev.forEach((g, ri) => {
     const isExpanded = ri === 0;
-    html += `<div class="game-entry" data-idx="${rev.length - 1 - ri}">
+    html += `<div class="game-entry" data-idx="${rev.length - 1 - ri}" data-id="${g.id}">
       <div class="ge-top">
         <div><div class="ge-tag">${g.gameLabel} · ${g.date} ${g.time}</div>
         <div class="ge-winner"><span>${g.winner}</span> · ${g.winnerScore} pts</div></div>
-        <div style="color:var(--text-dimmer);font-size:16px">${isExpanded ? '▼' : '▶'}</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <button class="ge-delete" data-id="${g.id}" title="Delete game">✕</button>
+          <div style="color:var(--text-dimmer);font-size:16px">${isExpanded ? '▼' : '▶'}</div>
+        </div>
       </div>
       <div class="ge-players">
         ${g.players.map((p, pi) =>
@@ -1264,13 +1281,23 @@ function renderStats() {
   statsScroll.innerHTML = html;
 
   statsScroll.querySelectorAll('.game-entry').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.ge-delete')) return;
       const detail = el.querySelector('.ge-detail');
-      const arrow = el.querySelector('.ge-top > div:last-child');
+      const arrow = el.querySelector('.ge-top > div:last-child > div:last-child');
       if (detail) {
         detail.classList.toggle('open');
         arrow.textContent = detail.classList.contains('open') ? '▼' : '▶';
       }
+    });
+  });
+
+  statsScroll.querySelectorAll('.ge-delete').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      if (!confirm('Delete this game from history?')) return;
+      deleteGame(id);
     });
   });
 }
