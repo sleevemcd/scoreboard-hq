@@ -623,6 +623,52 @@ body.display-mode .scoreboard { display: none !important; }
 .dmc-rank { width: 28px; text-align: center; font-size: clamp(12px, 1.4vmin, 16px); }
 .dmc-name { flex: 1; font-weight: 600; }
 .dmc-total { font-weight: 700; color: #00ff88; font-size: clamp(14px, 1.8vmin, 22px); }
+
+/* ─── Dr. Mario ─── */
+.drmario-game {
+  flex: 1; display: flex; flex-direction: column; padding: 16px; overflow-y: auto;
+}
+.drmario-header {
+  text-align: center; font-size: 14px; color: var(--text-dim); margin-bottom: 12px;
+}
+.drmario-header .round-num { color: var(--primary); font-weight: 800; }
+.drmario-players { display: flex; gap: 12px; flex: 1; }
+.drmario-player {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  background: var(--surface2); border-radius: var(--radius); padding: 16px;
+  border: 2px solid transparent; transition: border-color .2s;
+}
+.drmario-player.current-round-winner { border-color: var(--accent); }
+.drmario-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.drmario-rounds { font-size: 48px; font-weight: 900; color: var(--primary); line-height: 1; }
+.drmario-rounds-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.drmario-dots { display: flex; gap: 6px; margin-bottom: 4px; }
+.drmario-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--text-dimmer);
+}
+.drmario-dot.filled { background: var(--primary); border-color: var(--primary); }
+.drmario-game-count { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+.drmario-btn {
+  width: 100%; padding: 14px; border: none; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dim));
+  color: var(--bg); font-size: 16px; font-weight: 800; cursor: pointer;
+  transition: transform .1s;
+}
+.drmario-btn:active { transform: scale(0.96); }
+.drmario-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.drmario-end {
+  margin-top: 12px; width: 100%; padding: 12px; border: 2px solid var(--surface2);
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-dim);
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s;
+}
+.drmario-end:hover { border-color: var(--danger); color: var(--danger); }
+.drmario-round-won {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(15,15,26,0.9); border-radius: var(--radius); z-index: 10;
+  font-size: 20px; font-weight: 800; color: var(--accent);
+  animation: fadeIn .3s;
+}
 </style>
 </head>
 <body>
@@ -639,6 +685,7 @@ body.display-mode .scoreboard { display: none !important; }
         <button data-game="chipstick" class="active">Chip &amp; Stick</button>
         <button data-game="cornhole">Cornhole</button>
         <button data-game="pigs">🐷 Pass the Pigs</button>
+        <button data-game="drmario">💊 Dr. Mario</button>
       </div>
     </div>
     <div class="section">
@@ -686,6 +733,15 @@ body.display-mode .scoreboard { display: none !important; }
       <div class="carousel" id="carousel"></div>
     </div>
     <div class="dots" id="dots"></div>
+  </div>
+
+  <!-- Dr. Mario Game -->
+  <div class="drmario-game" id="drmarioGame" style="display:none">
+    <div class="drmario-header">
+      Round <span class="round-num" id="dmRoundNum">1</span> · Race to <span id="dmTarget">3</span>
+    </div>
+    <div class="drmario-players" id="dmPlayers"></div>
+    <button class="drmario-end" id="dmEndBtn">End Match</button>
   </div>
 
   <!-- Status / Leaderboard -->
@@ -779,6 +835,11 @@ const DEFS = {
     buttons: [],
     special: null,
   },
+  drmario: {
+    label: 'Dr. Mario',
+    buttons: [],
+    special: null,
+  },
 };
 
 const PIG_POSITIONS = {
@@ -811,6 +872,14 @@ let pigsState = {
   turnScore: 0,
   turnThrows: [],
   eliminated: false,
+};
+
+let drmarioState = {
+  roundWins: {},
+  gameWins: {},
+  roundNum: 1,
+  targetWins: 3,
+  roundHistory: [],
 };
 
 let touchStartX = 0, touchStartY = 0, touchDeltaX = 0, isDragging = false;
@@ -1125,7 +1194,7 @@ gameBtns.forEach(b => b.addEventListener('click', () => {
   gameBtns.forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   state.game = b.dataset.game;
-  roundsSection.style.display = state.game === 'pigs' ? 'none' : '';
+  roundsSection.style.display = (state.game === 'pigs' || state.game === 'drmario') ? 'none' : '';
 }));
 
 let roundBtns = document.querySelectorAll('#roundsSelect button');
@@ -1158,6 +1227,10 @@ startBtn.addEventListener('click', () => {
       eliminated: false,
     };
     state.players.forEach(p => { state.scores[p] = { total: 0, turns: [] }; });
+  } else if (state.game === 'drmario') {
+    state.totalRounds = 999;
+    startDrmario();
+    state.players.forEach(p => { state.scores[p] = []; });
   } else {
     state.players.forEach(p => { state.scores[p] = []; });
   }
@@ -1184,7 +1257,16 @@ function show(view) {
   stats.classList.toggle('active', view === 'stats');
   results.classList.toggle('active', view === 'results');
   setActiveTab(view);
-  if (view === 'game') { buildCarousel(); updateUI(); }
+  if (view === 'game') {
+    if (state.game === 'drmario') {
+      renderDrmario();
+    } else {
+      const dmGame = $('drmarioGame');
+      if (dmGame) dmGame.style.display = 'none';
+      buildCarousel();
+      updateUI();
+    }
+  }
   else if (view === 'leaderboard') renderLeaderboard();
   else if (view === 'stats') renderStats();
   else if (view === 'setup') renderRoster();
@@ -1193,7 +1275,11 @@ function show(view) {
 function showGame() {
   if (!gameInProgress) return;
   show('game');
-  pushLive();
+  if (state.game === 'drmario') {
+    renderDrmario();
+  } else {
+    pushLive();
+  }
 }
 
 function backToSetup() {
@@ -1218,6 +1304,9 @@ function pigsGetPlayerTotal(p) {
 }
 
 function enterResults() {
+  if (state.game === 'drmario') {
+    return;
+  }
   const totals = state.players.map(p => ({
     name: p,
     total: pigsGetPlayerTotal(p),
@@ -1265,6 +1354,7 @@ function deleteGame(id) {
 }
 
 function saveGame() {
+  if (state.game === 'drmario') return;
   const games = loadGames();
   let totals, winner;
   if (state.game === 'pigs') {
@@ -1305,25 +1395,29 @@ function getPlayerStats(playerName, games) {
   let totalPts = 0, totalBalls = 0, specials = 0, obs = 0, bestRound = 0;
   mine.forEach(g => {
     const idx = g.players.indexOf(playerName);
-    totalPts += g.totals[idx] || 0;
-    if (g.game === 'pigs') {
-      const sc = g.scores[playerName];
-      if (sc && sc.turns) {
-        sc.turns.forEach(t => { if (t > bestRound) bestRound = t; });
-      }
+    if (g.game === 'drmario') {
+      totalPts += (g.roundWins && g.roundWins[playerName]) || 0;
     } else {
-      const ps = g.scores[playerName] || [];
-      ps.forEach(r => {
-        if (!r) return;
-        const rt = r.reduce((a, b) => a + (b || 0), 0);
-        if (rt > bestRound) bestRound = rt;
-        r.forEach(b => {
-          if (b === undefined) return;
-          totalBalls++;
-          if (b === 0) obs++;
-          else { const def = DEFS[g.game]; if (def && b === def.special) specials++; }
+      totalPts += g.totals[idx] || 0;
+      if (g.game === 'pigs') {
+        const sc = g.scores[playerName];
+        if (sc && sc.turns) {
+          sc.turns.forEach(t => { if (t > bestRound) bestRound = t; });
+        }
+      } else {
+        const ps = g.scores[playerName] || [];
+        ps.forEach(r => {
+          if (!r) return;
+          const rt = r.reduce((a, b) => a + (b || 0), 0);
+          if (rt > bestRound) bestRound = rt;
+          r.forEach(b => {
+            if (b === undefined) return;
+            totalBalls++;
+            if (b === 0) obs++;
+            else { const def = DEFS[g.game]; if (def && b === def.special) specials++; }
+          });
         });
-      });
+      }
     }
   });
   return {
@@ -1391,7 +1485,7 @@ function renderStats() {
           return `<div class="ge-row"><span class="ge-rp">${getDisplayName(p)}</span><span class="ge-rs">${g.totals[idx]} pts</span></div>`;
         }).join('')}
         <div class="ge-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--surface2);color:var(--text-dimmer);font-size:10px">
-          ${g.totalRounds} ${g.game === 'pigs' ? 'turns' : 'rounds'} · ${g.ballsPerRound > 0 ? g.ballsPerRound + ' balls/round' : 'Pigs'}
+          ${g.totalRounds} ${g.game === 'pigs' ? 'turns' : 'rounds'} · ${g.ballsPerRound > 0 ? g.ballsPerRound + ' balls/round' : g.game === 'drmario' ? 'Dr. Mario' : 'Pigs'}
         </div>
       </div>
     </div>`;
@@ -1440,6 +1534,12 @@ statsClearBtn.addEventListener('click', () => {
 const lbBackBtn = $('lbBackBtn');
 lbBackBtn.addEventListener('click', showGame);
 
+$('dmEndBtn').addEventListener('click', () => {
+  if (confirm('End the match and record results?')) {
+    endDrmarioMatch();
+  }
+});
+
 const LIVE_KEY = 'scoreboard_hq_live';
 const LIVECODE_KEY = 'scoreboard_hq_livecode';
 let liveEnabled = false;
@@ -1485,6 +1585,12 @@ function pushLive() {
     payload.pigsCurrentPlayer = state.currentPlayer;
     payload.pigsEliminated = state.players.filter(p => state.scores[p] && state.scores[p].eliminated);
   }
+  if (state.game === 'drmario') {
+    payload.drmarioRoundWins = { ...drmarioState.roundWins };
+    payload.drmarioGameWins = { ...drmarioState.gameWins };
+    payload.drmarioRoundNum = drmarioState.roundNum;
+    payload.drmarioTargetWins = drmarioState.targetWins;
+  }
   clearTimeout(livePushTimer);
   livePushTimer = setTimeout(() => {
     if (apiAvailable) {
@@ -1518,6 +1624,12 @@ function pushResult() {
     payload.pigsTurnThrows = [...pigsState.turnThrows];
     payload.pigsCurrentPlayer = state.currentPlayer;
     payload.pigsEliminated = state.players.filter(p => state.scores[p] && state.scores[p].eliminated);
+  }
+  if (state.game === 'drmario') {
+    payload.drmarioRoundWins = { ...drmarioState.roundWins };
+    payload.drmarioGameWins = { ...drmarioState.gameWins };
+    payload.drmarioRoundNum = drmarioState.roundNum;
+    payload.drmarioTargetWins = drmarioState.targetWins;
   }
   clearTimeout(livePushTimer);
   if (apiAvailable) {
@@ -1700,6 +1812,20 @@ function renderSingleDisplay(snap) {
         <div class="d-total ${isLeader ? 'lead' : ''}">${t.total}</div>
       </div>`;
     }
+    if (snap.game === 'drmario') {
+      const roundWins = (snap.drmarioRoundWins || {})[t.name] || 0;
+      const gameWins = (snap.drmarioGameWins || {})[t.name] || 0;
+      const maxGw = snap.drmarioTargetWins || 3;
+      const dots = Array.from({ length: maxGw }, (_, j) =>
+        `<div class="d-ball ${j < gameWins ? 'filled' : ''}">${j < gameWins ? '●' : '○'}</div>`
+      ).join('');
+      return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
+        <div class="d-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
+        <div class="d-name">${esc(getDisplayName(t.name))}<div class="d-rounds">Rounds: ${roundWins}</div></div>
+        <div class="d-balls">${dots}</div>
+        <div class="d-total ${isLeader ? 'lead' : ''}">${roundWins}</div>
+      </div>`;
+    }
     const balls = currentRoundBalls(snap, t.name);
     const roundTotal = balls.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
     return `<div class="d-row ${isTurn ? 'turn' : ''} ${isLeader ? 'leader' : ''}">
@@ -1715,6 +1841,9 @@ function renderSingleDisplay(snap) {
     dFooter.innerHTML = turnName
       ? `🎯 <span class="f-name">${esc(getDisplayName(turnName))}</span> is up · Turn score: ${snap.pigsTurnScore || 0}`
       : (snap.status === 'finished' ? '🏁 Game over' : 'Waiting for the game to start…');
+  } else if (snap.game === 'drmario') {
+    dRoundWrap.innerHTML = `Round <b id="dRound">${snap.drmarioRoundNum || 1}</b> · Race to <b>${snap.drmarioTargetWins || 3}</b>`;
+    dFooter.innerHTML = `Round ${snap.drmarioRoundNum || 1} · Race to ${(snap.drmarioTargetWins || 3)} wins`;
   } else {
     dFooter.innerHTML = turnName
       ? `🎯 <span class="f-name">${esc(getDisplayName(turnName))}</span> is up · Ball ${snap.ball}`
@@ -1727,6 +1856,9 @@ function playerTotalFromSnap(snap, p) {
     const sc = snap.scores[p];
     return sc ? (sc.total || 0) : 0;
   }
+  if (snap.game === 'drmario') {
+    return (snap.drmarioRoundWins || {})[p] || 0;
+  }
   const s = snap.scores[p] || [];
   let t = 0;
   for (const r of s) if (r) for (const b of r) if (typeof b === 'number') t += b;
@@ -1734,7 +1866,7 @@ function playerTotalFromSnap(snap, p) {
 }
 
 function currentRoundBalls(snap, p) {
-  if (snap.game === 'pigs') return [];
+  if (snap.game === 'pigs' || snap.game === 'drmario') return [];
   const ri = (snap.round || 1) - 1;
   return (snap.scores[p] || [])[ri] || [];
 }
@@ -1744,6 +1876,11 @@ function roundsHistory(snap, p) {
     const sc = snap.scores[p];
     if (!sc || !sc.turns) return 'Turns: —';
     return 'Turns: ' + (sc.turns.length ? sc.turns.join(' · ') : '—');
+  }
+  if (snap.game === 'drmario') {
+    const rw = (snap.drmarioRoundWins || {})[p] || 0;
+    const gw = (snap.drmarioGameWins || {})[p] || 0;
+    return `Rounds: ${rw} · Games: ${gw}/${snap.drmarioTargetWins || 3}`;
   }
   const s = snap.scores[p] || [];
   const rt = s.map(r => r ? r.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0) : 0);
@@ -1967,7 +2104,123 @@ function updatePigsUI() {
   totalRounds.textContent = state.players.length;
 }
 
+function startDrmario() {
+  drmarioState = {
+    roundWins: {},
+    gameWins: {},
+    roundNum: 1,
+    targetWins: 3,
+    roundHistory: [],
+  };
+  state.players.forEach(p => {
+    drmarioState.roundWins[p] = 0;
+    drmarioState.gameWins[p] = 0;
+  });
+}
+
+function awardGameWin(pi) {
+  const p = state.players[pi];
+  drmarioState.gameWins[p]++;
+
+  if (drmarioState.gameWins[p] >= drmarioState.targetWins) {
+    drmarioState.roundWins[p]++;
+    const roundResult = {
+      winner: p,
+      games: [],
+    };
+    drmarioState.roundHistory.push(roundResult);
+    state.players.forEach(pl => { drmarioState.gameWins[pl] = 0; });
+    drmarioState.roundNum++;
+    spawnConfetti();
+  }
+
+  renderDrmario();
+  pushLive();
+}
+
+function endDrmarioMatch() {
+  const sorted = state.players.map(p => ({
+    name: p,
+    rounds: drmarioState.roundWins[p] || 0,
+  })).sort((a, b) => b.rounds - a.rounds);
+
+  const winner = sorted[0];
+
+  const games = loadGames();
+  games.unshift({
+    id: Date.now(),
+    date: new Date().toLocaleDateString(),
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    game: 'drmario',
+    gameLabel: 'Dr. Mario',
+    players: [...state.players],
+    totalRounds: drmarioState.roundNum - 1,
+    ballsPerRound: 0,
+    roundWins: { ...drmarioState.roundWins },
+    winner: winner.name,
+    winnerScore: winner.rounds,
+    totals: state.players.map(p => drmarioState.roundWins[p] || 0),
+  });
+  lsSet(STORAGE_KEY, JSON.stringify(games));
+
+  winnerName.textContent = winner.name;
+  winnerScore.textContent = `${winner.rounds} round${winner.rounds !== 1 ? 's' : ''} won`;
+  scorecard.innerHTML = sorted.map((t, i) =>
+    `<div class="row">
+      <div class="rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</div>
+      <div class="pname">${getDisplayName(t.name)}</div>
+      <div class="ptotal">${t.rounds} round${t.rounds !== 1 ? 's' : ''}</div>
+    </div>`
+  ).join('');
+
+  gameInProgress = false;
+  pushResult();
+  show('results');
+}
+
+function renderDrmario() {
+  const dmGame = $('drmarioGame');
+  const gameView = $('game');
+
+  if (state.game !== 'drmario' || !gameInProgress) {
+    dmGame.style.display = 'none';
+    gameView.style.display = '';
+    return;
+  }
+
+  gameView.style.display = 'none';
+  dmGame.style.display = 'flex';
+
+  $('dmRoundNum').textContent = drmarioState.roundNum;
+  $('dmTarget').textContent = drmarioState.targetWins;
+
+  const playersEl = $('dmPlayers');
+  playersEl.innerHTML = state.players.map((p, i) => {
+    const roundWins = drmarioState.roundWins[p] || 0;
+    const gameWins = drmarioState.gameWins[p] || 0;
+    const dots = Array.from({ length: drmarioState.targetWins }, (_, j) =>
+      `<div class="drmario-dot ${j < gameWins ? 'filled' : ''}"></div>`
+    ).join('');
+
+    return `<div class="drmario-player">
+      <div class="drmario-name">${getDisplayName(p)}</div>
+      <div class="drmario-rounds">${roundWins}</div>
+      <div class="drmario-rounds-label">Rounds</div>
+      <div class="drmario-dots">${dots}</div>
+      <div class="drmario-game-count">${gameWins}/${drmarioState.targetWins}</div>
+      <button class="drmario-btn" data-pi="${i}">Win Game</button>
+    </div>`;
+  }).join('');
+
+  playersEl.querySelectorAll('.drmario-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      awardGameWin(parseInt(btn.dataset.pi));
+    });
+  });
+}
+
 function buildCarousel() {
+  if (state.game === 'drmario') return;
   if (state.game === 'pigs') {
     carousel.innerHTML = state.players.map((p, i) => {
       const sc = state.scores[p];
@@ -2265,6 +2518,31 @@ function renderLeaderboard() {
       row += `<td class="lb-name">${getDisplayName(t.name)}${t.eliminated ? ' <span style="color:var(--danger)">(out)</span>' : ''}</td>`;
       row += `<td class="lb-ball">${t.turns}</td>`;
       row += `<td class="lb-total">${t.total}</td>`;
+      row += '</tr>';
+      return row;
+    }).join('');
+    lbTable.innerHTML = headHtml + rows;
+    return;
+  }
+
+  if (state.game === 'drmario') {
+    const sorted = state.players.map(p => ({
+      name: p,
+      rounds: drmarioState.roundWins[p] || 0,
+      games: drmarioState.gameWins[p] || 0,
+    })).sort((a, b) => b.rounds - a.rounds);
+
+    let progHtml = `<div class="lp-info">Round <span>${drmarioState.roundNum}</span> · Race to <span class="b">${drmarioState.targetWins}</span> game wins</div>`;
+    lbProgress.innerHTML = progHtml;
+
+    let headHtml = '<tr><th>#</th><th>Player</th><th>Games</th><th>Rounds</th></tr>';
+    const rows = sorted.map((t, i) => {
+      const isLeader = t.rounds > 0 && sorted[0] && t.name === sorted[0].name;
+      let row = `<tr class="${isLeader ? 'leader' : ''}">`;
+      row += `<td class="lb-rank">${isLeader ? '🥇' : i + 1}</td>`;
+      row += `<td class="lb-name">${getDisplayName(t.name)}</td>`;
+      row += `<td class="lb-ball">${t.games}/${drmarioState.targetWins}</td>`;
+      row += `<td class="lb-total">${t.rounds}</td>`;
       row += '</tr>';
       return row;
     }).join('');
