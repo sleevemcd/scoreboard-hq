@@ -2429,7 +2429,7 @@ async function initApi() {
 }
 
 if (DISPLAY_MODE) {
-  initDisplay();
+  initApi().then(() => initDisplay());
 } else {
   initApi().then(() => {
     liveEnabled = lsGet(LIVE_KEY) === '1';
