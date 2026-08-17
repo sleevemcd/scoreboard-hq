@@ -1120,10 +1120,12 @@ function editPlayer(i) {
 function updateStartBtn() { startBtn.disabled = selPlayers.length < 2; }
 
 let gameBtns = document.querySelectorAll('#gameSelect button');
+const roundsSection = document.querySelector('#roundsSelect').parentElement;
 gameBtns.forEach(b => b.addEventListener('click', () => {
   gameBtns.forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   state.game = b.dataset.game;
+  roundsSection.style.display = state.game === 'pigs' ? 'none' : '';
 }));
 
 let roundBtns = document.querySelectorAll('#roundsSelect button');
