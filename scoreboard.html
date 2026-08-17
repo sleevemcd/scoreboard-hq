@@ -1252,17 +1252,17 @@ function setActiveTab(view) {
 
 function show(view) {
   setup.classList.toggle('show', view === 'setup');
-  game.classList.toggle('active', view === 'game');
+  game.classList.toggle('active', view === 'game' && state.game !== 'drmario');
   leaderboard.classList.toggle('active', view === 'leaderboard');
   stats.classList.toggle('active', view === 'stats');
   results.classList.toggle('active', view === 'results');
+  const dmGame = $('drmarioGame');
+  if (dmGame) dmGame.style.display = (view === 'game' && state.game === 'drmario') ? 'flex' : 'none';
   setActiveTab(view);
   if (view === 'game') {
     if (state.game === 'drmario') {
       renderDrmario();
     } else {
-      const dmGame = $('drmarioGame');
-      if (dmGame) dmGame.style.display = 'none';
       buildCarousel();
       updateUI();
     }
@@ -2180,15 +2180,11 @@ function endDrmarioMatch() {
 
 function renderDrmario() {
   const dmGame = $('drmarioGame');
-  const gameView = $('game');
-
   if (state.game !== 'drmario' || !gameInProgress) {
     dmGame.style.display = 'none';
-    gameView.style.display = '';
     return;
   }
 
-  gameView.style.display = 'none';
   dmGame.style.display = 'flex';
 
   $('dmRoundNum').textContent = drmarioState.roundNum;
